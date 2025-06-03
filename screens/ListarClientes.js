@@ -42,7 +42,7 @@ export default function ListarClientes({ navigation }) {
     lista.sort((a, b) => {
       const fechaA = a.fechaRegistro?.toDate?.() || new Date(0);
       const fechaB = b.fechaRegistro?.toDate?.() || new Date(0);
-      return fechaB - fechaA; // Más reciente primero
+      return fechaB - fechaA; 
     });
 
     setClientes(lista);
