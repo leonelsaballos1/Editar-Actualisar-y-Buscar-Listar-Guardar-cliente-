@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,95 +6,158 @@ import {
   StyleSheet,
   Alert,
   TouchableOpacity,
+  Animated,
+  TextInput,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons'; 
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  collection,
+  getFirestore,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+  addDoc,
+} from 'firebase/firestore';
+import appFirebase from '../BasedeDatos/Firebase';
+
+const db = getFirestore(appFirebase);
 
 export default function ListarClientes({ navigation }) {
-  const [clientes, setClientes] = useState([
-    {
-      nuevacedula: '001-230498-0001X',
-      nuevosnombres: 'Carlos Andrés',
-      nuevosapellidos: 'Ramirez López',
-      nuevafechanac: '1998-04-23',
-      nuevosexo: 'Masculino',
-    },
-    {
-      nuevacedula: '002-150692-0002K',
-      nuevosnombres: 'María Fernanda',
-      nuevosapellidos: 'González Martínez',
-      nuevafechanac: '1992-06-15',
-      nuevosexo: 'Femenino',
-    },
-    {
-      nuevacedula: '003-310100-0003L',
-      nuevosnombres: 'Luis Enrique',
-      nuevosapellidos: 'Pérez Gutiérrez',
-      nuevafechanac: '2000-01-31',
-      nuevosexo: 'Masculino',
-    },
-    {
-      nuevacedula: '004-080385-0004M',
-      nuevosnombres: 'Ana Lucía',
-      nuevosapellidos: 'Vargas Muñoz',
-      nuevafechanac: '1985-03-08',
-      nuevosexo: 'Femenino',
-    },
-  ]);
+  const [clientes, setClientes] = useState([]);
+  const [busquedaTexto, setBusquedaTexto] = useState('');
+  const [mostrarBuscador, setMostrarBuscador] = useState(false);
+  const searchHeight = useRef(new Animated.Value(0)).current;
+  const scaleValue = useRef(new Animated.Value(1)).current;
 
-  const guardarNuevo = (nuevoCliente) => {
-    setClientes([
-      ...clientes,
+  useEffect(() => {
+  const refClientes = collection(db, 'clientes');
+  const unsubscribe = onSnapshot(refClientes, (snapshot) => {
+    const lista = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    // Ordenar por fechaRegistro descendente
+    lista.sort((a, b) => {
+      const fechaA = a.fechaRegistro?.toDate?.() || new Date(0);
+      const fechaB = b.fechaRegistro?.toDate?.() || new Date(0);
+      return fechaB - fechaA; // Más reciente primero
+    });
+
+    setClientes(lista);
+  });
+
+  return () => unsubscribe();
+}, []);
+
+
+  const toggleBuscador = () => {
+    setMostrarBuscador((prev) => {
+      const nextState = !prev;
+      Animated.timing(searchHeight, {
+        toValue: nextState ? 60 : 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      return nextState;
+    });
+  };
+
+  const guardarNuevo = async (cliente, idExistente = null) => {
+    try {
+      if (idExistente) {
+        await setDoc(doc(db, 'clientes', idExistente), cliente);
+      } else {
+        await addDoc(collection(db, 'clientes'), {
+          ...cliente,
+          fechaRegistro: new Date(),
+        });
+      }
+    } catch (error) {
+      console.error('Error al guardar cliente:', error);
+    }
+  };
+
+  const eliminarCliente = (id) => {
+    Alert.alert('Confirmar', '¿Desea eliminar este cliente?', [
+      { text: 'Cancelar', style: 'cancel' },
       {
-        nuevacedula: nuevoCliente.cedula,
-        nuevosnombres: nuevoCliente.nombres,
-        nuevosapellidos: nuevoCliente.apellidos,
-        nuevafechanac: nuevoCliente.fechanac,
-        nuevosexo: nuevoCliente.sexo,
+        text: 'Eliminar',
+        onPress: async () => {
+          await deleteDoc(doc(db, 'clientes', id));
+        },
+        style: 'destructive',
       },
     ]);
   };
 
-  const eliminarCliente = (index) => {
-    Alert.alert(
-      'Confirmar eliminación',
-      '¿Está seguro de que desea eliminar este cliente?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          onPress: () => {
-            const nuevaLista = [...clientes];
-            nuevaLista.splice(index, 1);
-            setClientes(nuevaLista);
-          },
-          style: 'destructive',
-        },
-      ]
-    );
+  const onPressIn = () => {
+    Animated.spring(scaleValue, { toValue: 0.85, useNativeDriver: true }).start();
   };
 
-  const renderItem = ({ item, index }) => (
+  const onPressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 3,
+      tension: 40,
+    }).start();
+  };
+
+  const texto = busquedaTexto.toLowerCase();
+  const clientesFiltrados = clientes.filter((item) => {
+    return (
+      item.nuevacedula?.toLowerCase().includes(texto) ||
+      item.nuevosnombres?.toLowerCase().includes(texto) ||
+      item.nuevosapellidos?.toLowerCase().includes(texto) ||
+      item.nuevafechanac?.toLowerCase().includes(texto) ||
+      item.nuevosexo?.toLowerCase().includes(texto)
+    );
+  });
+
+  const renderItem = ({ item }) => (
     <View style={styles.item}>
       <View style={{ flex: 1 }}>
+        <Text style={styles.text}><Text style={styles.label}>Cédula:</Text> {item.nuevacedula}</Text>
+        <Text style={styles.text}><Text style={styles.label}>Nombres:</Text> {item.nuevosnombres}</Text>
+        <Text style={styles.text}><Text style={styles.label}>Apellidos:</Text> {item.nuevosapellidos}</Text>
+        <Text style={styles.text}><Text style={styles.label}>Fecha nac.:</Text> {item.nuevafechanac}</Text>
         <Text style={styles.text}>
-          <Text style={styles.label}>Cédula:</Text> {item.nuevacedula}
-        </Text>
-        <Text style={styles.text}>
-          <Text style={styles.label}>Nombres:</Text> {item.nuevosnombres}
-        </Text>
-        <Text style={styles.text}>
-          <Text style={styles.label}>Apellidos:</Text> {item.nuevosapellidos}
-        </Text>
-        <Text style={styles.text}>
-          <Text style={styles.label}>Fecha de nacimiento:</Text> {item.nuevafechanac}
-        </Text>
-        <Text style={styles.text}>
-          <Text style={styles.label}>Sexo:</Text> {item.nuevosexo}
+          <Text style={styles.label}>Sexo:</Text> {item.nuevosexo}{' '}
+          <MaterialCommunityIcons
+            name={item.nuevosexo === 'Masculino' ? 'gender-male' : 'gender-female'}
+            size={20}
+            color={item.nuevosexo === 'Masculino' ? '#4caf50' : '#4db6ac'}
+          />
         </Text>
       </View>
-      <TouchableOpacity onPress={() => eliminarCliente(index)}>
-        <MaterialCommunityIcons name="trash-can-outline" size={26} color="red" />
-      </TouchableOpacity>
+
+      <View style={styles.botones}>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('RegistrarCliente', {
+              guardarNuevo,
+              clienteExistente: item,
+              idCliente: item.id,
+            })
+          }
+          style={styles.botonEditar}
+        >
+          <MaterialCommunityIcons name="square-edit-outline" size={30} color="#1976d2" />
+        </TouchableOpacity>
+
+        <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
+          <TouchableOpacity
+            onPress={() => eliminarCliente(item.id)}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            style={styles.botonEliminar}
+          >
+            <MaterialCommunityIcons name="trash-can-outline" size={30} color="#e53935" />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
     </View>
   );
 
@@ -102,49 +165,79 @@ export default function ListarClientes({ navigation }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Lista de Clientes</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('RegistrarCliente', { guardarNuevo })}>
-          <MaterialCommunityIcons name="account-plus-outline" size={30} color="green" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity
+            onPress={toggleBuscador}
+            style={styles.botonAgregar}
+          >
+            <MaterialCommunityIcons name="magnify" size={28} color="#4caf50" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate('RegistrarCliente', { guardarNuevo })
+            }
+            style={styles.botonAgregar}
+          >
+            <MaterialCommunityIcons name="account-plus-outline" size={32} color="#4caf50" />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <Animated.View style={[styles.searchContainer, { height: searchHeight, overflow: 'hidden' }]}>
+        <TextInput
+          placeholder="Buscar cliente..."
+          style={styles.inputBuscar}
+          value={busquedaTexto}
+          onChangeText={setBusquedaTexto}
+        />
+      </Animated.View>
+
       <FlatList
-        data={clientes}
-        keyExtractor={(item, index) => index.toString()}
+        data={clientesFiltrados}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        contentContainerStyle={{ paddingBottom: 50 }}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#e3f3e3',
-    padding: 20,
+  container: { flex: 1, backgroundColor: '#d0e8f2', padding: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  title: { fontSize: 26, fontWeight: '700' },
+  botonAgregar: {
+    backgroundColor: '#d0e8f2',
+    padding: 10,
+    borderRadius: 50,
+    elevation: 8,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  searchContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#4caf50',
     marginBottom: 15,
+    justifyContent: 'center',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: 'green',
+  inputBuscar: {
+    fontSize: 16,
+    paddingVertical: 8,
+    color: '#333',
   },
   item: {
-    backgroundColor: '#c6e8c6',
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#e0f7fa',
+    borderRadius: 16,
     marginBottom: 15,
+    padding: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    elevation: 6,
   },
-  text: {
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  label: {
-    fontWeight: 'bold',
-  },
+  text: { fontSize: 16, marginBottom: 6, color: '#333', fontWeight: '600' },
+  label: { fontWeight: '700', color: '#00796b' },
+  botones: { justifyContent: 'center', alignItems: 'center', gap: 10 },
+  botonEditar: { backgroundColor: '#bbdefb', padding: 8, borderRadius: 30 },
+  botonEliminar: { backgroundColor: '#ffcdd2', padding: 8, borderRadius: 30 },
 });

@@ -1,2 +1,0 @@
-# registro-de-cliente
-# Registrodecliente
