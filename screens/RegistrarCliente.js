@@ -52,10 +52,10 @@ export default function RegistrarCliente({ route }) {
 
 // Validaciones automáticas para cédula y fecha
 const formatearCedula = (texto) => {
-  // Separar números del texto final (letras)
+ 
   const match = texto.match(/^([0-9]*)([A-Za-z]*)$/);
-  let numeros = texto.replace(/[^0-9]/g, '').slice(0, 13); // solo los primeros 13 dígitos
-  let letras = texto.replace(/[^A-Za-z]/g, ''); // letras al final
+  let numeros = texto.replace(/[^0-9]/g, '').slice(0, 13); 
+  let letras = texto.replace(/[^A-Za-z]/g, ''); 
 
   // Formateo con guiones: 000-000000-0000
   if (numeros.length > 3 && numeros.length <= 9) {
@@ -65,7 +65,7 @@ const formatearCedula = (texto) => {
     numeros = numeros.slice(0, 3) + '-' + numeros.slice(3, 9) + '-' + numeros.slice(9);
   }
 
-  return (numeros + letras).slice(0, 25); // permite cédulas como 365-130995-0002H o ...Nicaragua
+  return (numeros + letras).slice(0, 25); 
 };
 
 const formatearFecha = (texto) => {
@@ -91,7 +91,7 @@ const formatearFecha = (texto) => {
           value={cedula}
           placeholder="000-000000-0000"
           onChangeText={(texto) => setCedula(formatearCedula(texto))}
-          //editable={!modoEdicion}
+         
         />
       </View>
 
