@@ -38,7 +38,7 @@ export default function ListarClientes({ navigation }) {
       ...docSnap.data(),
     }));
 
-    // Ordenar por fechaRegistro descendente
+    // Ordenar por  descendente
     lista.sort((a, b) => {
       const fechaA = a.fechaRegistro?.toDate?.() || new Date(0);
       const fechaB = b.fechaRegistro?.toDate?.() || new Date(0);
